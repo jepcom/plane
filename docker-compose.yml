@@ -151,13 +151,24 @@ services:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
 
-  # Comment this if you already have a reverse proxy running
+  # Caddy reverse proxy - routes all traffic internally
+  # Coolify's Traefik handles SSL + domain, Caddy handles path routing
   proxy:
     container_name: proxy
     build:
       context: ./apps/proxy
       dockerfile: Dockerfile.ce
     restart: always
+    expose:
+      - "3080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.plane-https.rule=Host(`plane.exerun.com`)"
+      - "traefik.http.routers.plane-https.entrypoints=https"
+      - "traefik.http.routers.plane-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.plane-http.rule=Host(`plane.exerun.com`)"
+      - "traefik.http.routers.plane-http.entrypoints=http"
+      - "traefik.http.services.plane.loadbalancer.server.port=3080"
     environment:
       FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
       BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
@@ -168,6 +179,13 @@ services:
       - api
       - space
       - admin
+    networks:
+      - default
+      - coolify
+
+networks:
+  coolify:
+    external: true
 
 volumes:
   pgdata:
